@@ -2,7 +2,7 @@
 const express = require('express');
 require('dotenv').config();
 const { testConnection } = require('./db');
-const { clientExists } = require('./clients');
+const { checkOrCreateClient } = require('./clients');
 
 // Crear instancia de Express
 const app = express();
@@ -53,12 +53,13 @@ app.post('/webhook/whatsapp', async (req, res) => {
     console.log(`Texto: ${body}`);
     
     // Verificar si el cliente es nuevo o recurrente
-    const exists = await clientExists(from);
+    // Si es nuevo, se inserta automáticamente en la tabla whatsapp_clientes
+    const { isNew } = await checkOrCreateClient(from);
     
-    if (exists) {
-      console.log('🔁 Cliente recurrente');
-    } else {
+    if (isNew) {
       console.log('🆕 Cliente nuevo');
+    } else {
+      console.log('🔁 Cliente recurrente');
     }
     
     // Responder JSON
