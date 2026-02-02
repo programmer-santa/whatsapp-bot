@@ -1,6 +1,7 @@
 // Importar dependencias
 const express = require('express');
 require('dotenv').config();
+const { testConnection } = require('./db');
 
 // Crear instancia de Express
 const app = express();
@@ -53,9 +54,12 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 
 // Iniciar servidor
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 Servidor Express corriendo en el puerto ${PORT}`);
   console.log(`📍 Health check: http://localhost:${PORT}/health`);
+  
+  // Probar conexión a la base de datos
+  await testConnection();
 });
 
 // Manejo de errores no capturados
