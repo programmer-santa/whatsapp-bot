@@ -2,7 +2,7 @@
 const express = require('express');
 require('dotenv').config();
 const { testConnection } = require('./db');
-const { processMessage } = require('./chats');
+const { processMessage, markAsAttended } = require('./chats');
 
 // Crear instancia de Express
 const app = express();
@@ -29,7 +29,8 @@ app.get('/', (req, res) => {
     version: '1.0.0',
     endpoints: {
       health: '/health',
-      webhook: '/webhook/whatsapp'
+      webhook: '/webhook/whatsapp',
+      barberoResponde: '/webhook/barbero-responde'
     }
   });
 });
@@ -91,6 +92,50 @@ app.post('/webhook/whatsapp', async (req, res) => {
     // En caso de error, loguear pero responder 200 para no causar reintentos
     console.error('❌ Error al procesar webhook:', error);
     res.status(200).json({ ok: true });
+  }
+});
+
+// Webhook para que el barbero marque un cliente como atendido
+app.post('/webhook/barbero-responde', async (req, res) => {
+  try {
+    // Leer datos del body (formato JSON)
+    const telefono = req.body.telefono;
+    const mensaje = req.body.mensaje;
+    
+    // Manejar caso donde falten datos
+    if (!telefono || !mensaje) {
+      console.warn('⚠️  Webhook barbero recibido sin datos completos');
+      return res.status(400).json({ 
+        ok: false, 
+        error: 'Faltan datos: telefono y mensaje son requeridos' 
+      });
+    }
+    
+    // Buscar y actualizar el chat
+    const result = await markAsAttended(telefono, mensaje);
+    
+    if (!result.success) {
+      console.warn(`⚠️  No se encontró chat para el teléfono: ${telefono}`);
+      return res.status(404).json({ 
+        ok: false, 
+        error: 'Chat no encontrado para este teléfono' 
+      });
+    }
+    
+    // Log en consola
+    console.log('🧔 Barbero respondió');
+    console.log(`📞 Teléfono: ${telefono}`);
+    
+    // Responder JSON
+    res.status(200).json({ ok: true });
+    
+  } catch (error) {
+    // En caso de error, loguear y responder
+    console.error('❌ Error al procesar respuesta del barbero:', error);
+    res.status(500).json({ 
+      ok: false, 
+      error: 'Error interno del servidor' 
+    });
   }
 });
 

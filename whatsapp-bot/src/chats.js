@@ -100,6 +100,54 @@ async function updateChatMessage(chatId, message) {
 }
 
 /**
+ * Marca un chat como atendido y actualiza el mensaje del barbero
+ * @param {string} phoneNumber - Número de teléfono
+ * @param {string} message - Mensaje del barbero
+ * @returns {Promise<{success: boolean, chat: object|null}>}
+ */
+async function markAsAttended(phoneNumber, message) {
+  try {
+    // Buscar chat por teléfono
+    const chat = await findChatByPhone(phoneNumber);
+    
+    if (!chat) {
+      // Chat no encontrado
+      return {
+        success: false,
+        chat: null
+      };
+    }
+    
+    // Actualizar estado a 'atendido', último mensaje e interacción
+    const now = new Date();
+    const query = `
+      UPDATE \`${TABLE_NAME}\`
+      SET \`estado\` = 'atendido', 
+          \`ultimo_mensaje\` = ?, 
+          \`ultima_interaccion\` = ?
+      WHERE \`id\` = ?
+    `;
+    
+    await pool.execute(query, [message, now, chat.id]);
+    
+    // Obtener el chat actualizado
+    const updatedChat = await findChatByPhone(phoneNumber);
+    
+    return {
+      success: true,
+      chat: updatedChat
+    };
+    
+  } catch (error) {
+    console.error('❌ Error al marcar como atendido:', error.message);
+    return {
+      success: false,
+      chat: null
+    };
+  }
+}
+
+/**
  * Procesa un mensaje recibido y retorna el estado del chat
  * @param {string} phoneNumber - Número de teléfono
  * @param {string} message - Mensaje recibido
@@ -155,5 +203,6 @@ module.exports = {
   findChatByPhone,
   createChat,
   updateChatMessage,
-  processMessage
+  processMessage,
+  markAsAttended
 };
