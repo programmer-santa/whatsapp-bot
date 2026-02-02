@@ -27,9 +27,38 @@ app.get('/', (req, res) => {
     message: 'WhatsApp Bot API',
     version: '1.0.0',
     endpoints: {
-      health: '/health'
+      health: '/health',
+      webhook: '/webhook/whatsapp'
     }
   });
+});
+
+// Webhook para recibir mensajes de WhatsApp
+app.post('/webhook/whatsapp', (req, res) => {
+  try {
+    // Leer datos del body (formato JSON)
+    const from = req.body.from;
+    const body = req.body.body;
+    
+    // Manejar caso donde falten datos
+    if (!from || !body) {
+      console.warn('⚠️  Webhook recibido sin datos completos');
+      return res.status(200).json({ ok: true });
+    }
+    
+    // Mostrar información en consola con formato específico
+    console.log('📩 Mensaje recibido');
+    console.log(`De: ${from}`);
+    console.log(`Texto: ${body}`);
+    
+    // Responder JSON
+    res.status(200).json({ ok: true });
+    
+  } catch (error) {
+    // En caso de error, loguear pero responder 200 para no causar reintentos
+    console.error('❌ Error al procesar webhook:', error);
+    res.status(200).json({ ok: true });
+  }
 });
 
 // Manejo de rutas no encontradas (404)
