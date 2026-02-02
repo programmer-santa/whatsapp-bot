@@ -70,7 +70,7 @@ app.post('/webhook/whatsapp', async (req, res) => {
     } else if (estado === 'atendido') {
       // Cliente atendido - mensaje de bienvenida nuevamente
       console.log('✅ Cliente atendido');
-      responseMessage = '👋 Gracias por escribir a nuestra barbería.\nEn breve un barbero te atenderá.';
+      responseMessage = '👋 ¡Bienvenido de nuevo!\n¿En qué podemos ayudarte hoy? 💈';
     } else {
       // Estado nuevo (por defecto)
       console.log('🆕 Cliente nuevo');
