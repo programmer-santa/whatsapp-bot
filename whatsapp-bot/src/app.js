@@ -2,7 +2,7 @@
 const express = require('express');
 require('dotenv').config();
 const { testConnection } = require('./db');
-const { checkOrCreateClient } = require('./clients');
+const { processMessage } = require('./chats');
 
 // Crear instancia de Express
 const app = express();
@@ -52,18 +52,40 @@ app.post('/webhook/whatsapp', async (req, res) => {
     console.log(`De: ${from}`);
     console.log(`Texto: ${body}`);
     
-    // Verificar si el cliente es nuevo o recurrente
-    // Si es nuevo, se inserta automáticamente en la tabla whatsapp_clientes
-    const { isNew } = await checkOrCreateClient(from);
+    // Procesar mensaje y obtener estado del chat
+    const { chat, estado, isNew } = await processMessage(from, body);
+    
+    // Determinar mensaje de respuesta según el estado
+    let responseMessage = '';
     
     if (isNew) {
+      // Cliente nuevo - crear chat con estado esperando_barbero
       console.log('🆕 Cliente nuevo');
+      responseMessage = '👋 Gracias por escribir a nuestra barbería.\nEn breve un barbero te atenderá.';
+    } else if (estado === 'esperando_barbero') {
+      // Cliente esperando barbero
+      console.log('🔁 Cliente esperando');
+      responseMessage = '⏳ Estamos procesando tu solicitud. Un barbero te atenderá pronto.';
+    } else if (estado === 'atendido') {
+      // Cliente atendido - mensaje de bienvenida nuevamente
+      console.log('✅ Cliente atendido');
+      responseMessage = '👋 Gracias por escribir a nuestra barbería.\nEn breve un barbero te atenderá.';
     } else {
-      console.log('🔁 Cliente recurrente');
+      // Estado nuevo (por defecto)
+      console.log('🆕 Cliente nuevo');
+      responseMessage = '👋 Gracias por escribir a nuestra barbería.\nEn breve un barbero te atenderá.';
     }
     
+    // Simular envío de mensaje (sin Twilio real)
+    console.log('📤 Mensaje de respuesta:');
+    console.log(responseMessage);
+    
     // Responder JSON
-    res.status(200).json({ ok: true });
+    res.status(200).json({ 
+      ok: true,
+      message: responseMessage,
+      estado: estado
+    });
     
   } catch (error) {
     // En caso de error, loguear pero responder 200 para no causar reintentos
