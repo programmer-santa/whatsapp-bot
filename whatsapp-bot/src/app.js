@@ -2,6 +2,7 @@
 const express = require('express');
 require('dotenv').config();
 const { testConnection } = require('./db');
+const { clientExists } = require('./clients');
 
 // Crear instancia de Express
 const app = express();
@@ -34,7 +35,7 @@ app.get('/', (req, res) => {
 });
 
 // Webhook para recibir mensajes de WhatsApp
-app.post('/webhook/whatsapp', (req, res) => {
+app.post('/webhook/whatsapp', async (req, res) => {
   try {
     // Leer datos del body (formato JSON)
     const from = req.body.from;
@@ -50,6 +51,15 @@ app.post('/webhook/whatsapp', (req, res) => {
     console.log('📩 Mensaje recibido');
     console.log(`De: ${from}`);
     console.log(`Texto: ${body}`);
+    
+    // Verificar si el cliente es nuevo o recurrente
+    const exists = await clientExists(from);
+    
+    if (exists) {
+      console.log('🔁 Cliente recurrente');
+    } else {
+      console.log('🆕 Cliente nuevo');
+    }
     
     // Responder JSON
     res.status(200).json({ ok: true });
