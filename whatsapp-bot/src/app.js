@@ -7,11 +7,9 @@ const { processMessage, markAsAttended } = require('./chats');
 // Crear instancia de Express
 const app = express();
 
-// Middleware para parsear JSON
+// IMPORTANTE: necesario para Twilio (envía application/x-www-form-urlencoded)
+app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
-
-// Middleware para parsear URL encoded
-app.use(express.urlencoded({ extended: true }));
 
 // Endpoint de salud para pruebas
 app.get('/health', (req, res) => {
@@ -38,23 +36,29 @@ app.get('/', (req, res) => {
 // Webhook para recibir mensajes de WhatsApp
 app.post('/webhook/whatsapp', async (req, res) => {
   try {
-    // Leer datos del body (formato JSON)
-    const from = req.body.from;
-    const body = req.body.body;
+    // Log del body completo para debugging
+    console.log('📥 Webhook RAW:', req.body);
+    
+    // Twilio envía los datos con mayúsculas: From y Body
+    const from = req.body.From;
+    const body = req.body.Body;
     
     // Manejar caso donde falten datos
     if (!from || !body) {
-      console.warn('⚠️  Webhook recibido sin datos completos');
-      return res.status(200).json({ ok: true });
+      console.log('⚠️ Webhook recibido sin datos completos');
+      return res.sendStatus(200);
     }
+    
+    // Limpiar el número de teléfono (remover prefijo whatsapp:)
+    const telefono = from.replace('whatsapp:', '');
     
     // Mostrar información en consola con formato específico
     console.log('📩 Mensaje recibido');
-    console.log(`De: ${from}`);
-    console.log(`Texto: ${body}`);
+    console.log('De:', telefono);
+    console.log('Texto:', body);
     
     // Procesar mensaje y obtener estado del chat
-    const { chat, estado, isNew } = await processMessage(from, body);
+    const { chat, estado, isNew } = await processMessage(telefono, body);
     
     // Determinar mensaje de respuesta según el estado
     let responseMessage = '';
@@ -81,17 +85,13 @@ app.post('/webhook/whatsapp', async (req, res) => {
     console.log('📤 Mensaje de respuesta:');
     console.log(responseMessage);
     
-    // Responder JSON
-    res.status(200).json({ 
-      ok: true,
-      message: responseMessage,
-      estado: estado
-    });
+    // Respuesta vacía correcta para Twilio (debe ser 200 sin body)
+    res.sendStatus(200);
     
   } catch (error) {
     // En caso de error, loguear pero responder 200 para no causar reintentos
     console.error('❌ Error al procesar webhook:', error);
-    res.status(200).json({ ok: true });
+    res.sendStatus(200);
   }
 });
 
