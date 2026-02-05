@@ -1,8 +1,10 @@
 // Importar dependencias
 const express = require('express');
+const twilio = require('twilio');
 require('dotenv').config();
 const { testConnection } = require('./db');
 const { processMessage, markAsAttended } = require('./chats');
+const { getServicios, getBarberos, formatServicios, formatBarberos } = require('./services');
 
 // Crear instancia de Express
 const app = express();
@@ -52,46 +54,79 @@ app.post('/webhook/whatsapp', async (req, res) => {
     // Limpiar el número de teléfono (remover prefijo whatsapp:)
     const telefono = from.replace('whatsapp:', '');
     
+    // Normalizar el mensaje
+    const mensaje = body.trim().toLowerCase();
+    
     // Mostrar información en consola con formato específico
     console.log('📩 Mensaje recibido');
     console.log('De:', telefono);
     console.log('Texto:', body);
     
-    // Procesar mensaje y obtener estado del chat
+    // Procesar mensaje y obtener estado del chat (solo si no es comando del menú)
     const { chat, estado, isNew } = await processMessage(telefono, body);
     
-    // Determinar mensaje de respuesta según el estado
+    // Crear respuesta TwiML
+    const twiml = new twilio.twiml.MessagingResponse();
     let responseMessage = '';
     
-    if (isNew) {
-      // Cliente nuevo - crear chat con estado esperando_barbero
-      console.log('🆕 Cliente nuevo');
-      responseMessage = '👋 Gracias por escribir a nuestra barbería.\nEn breve un barbero te atenderá.';
-    } else if (estado === 'esperando_barbero') {
-      // Cliente esperando barbero
-      console.log('🔁 Cliente esperando');
-      responseMessage = '⏳ Estamos procesando tu solicitud. Un barbero te atenderá pronto.';
-    } else if (estado === 'atendido') {
-      // Cliente atendido - mensaje de bienvenida nuevamente
-      console.log('✅ Cliente atendido');
-      responseMessage = '👋 ¡Bienvenido de nuevo!\n¿En qué podemos ayudarte hoy? 💈';
+    // Lógica del menú interactivo
+    if (mensaje.includes('hola') || mensaje.includes('menu') || mensaje === 'menú') {
+      // Mostrar menú principal
+      responseMessage = '👋 Bienvenido a *EL BUNKER* 💈\n\nResponde con el número de la opción:\n\n1️⃣ Ver servicios\n2️⃣ Ver barberos\n3️⃣ Agendar turno';
+      
+    } else if (mensaje === '1') {
+      // Consultar y mostrar servicios
+      const servicios = await getServicios();
+      responseMessage = formatServicios(servicios);
+      
+    } else if (mensaje === '2') {
+      // Consultar y mostrar barberos
+      const barberos = await getBarberos();
+      responseMessage = formatBarberos(barberos);
+      
+    } else if (mensaje === '3') {
+      // Instrucciones para agendar turno
+      responseMessage = '📅 Para agendar tu turno escribe:\n\nFECHA YYYY-MM-DD\nHORA HH:MM\n\nEjemplo:\n2026-02-10 15:00';
+      
     } else {
-      // Estado nuevo (por defecto)
-      console.log('🆕 Cliente nuevo');
-      responseMessage = '👋 Gracias por escribir a nuestra barbería.\nEn breve un barbero te atenderá.';
+      // Lógica existente para cliente nuevo/recurrente (solo si no es comando del menú)
+      if (isNew) {
+        // Cliente nuevo - crear chat con estado esperando_barbero
+        console.log('🆕 Cliente nuevo');
+        responseMessage = '👋 Gracias por escribir a nuestra barbería.\nEn breve un barbero te atenderá.';
+      } else if (estado === 'esperando_barbero') {
+        // Cliente esperando barbero
+        console.log('🔁 Cliente esperando');
+        responseMessage = '⏳ Estamos procesando tu solicitud. Un barbero te atenderá pronto.';
+      } else if (estado === 'atendido') {
+        // Cliente atendido - mensaje de bienvenida nuevamente
+        console.log('✅ Cliente atendido');
+        responseMessage = '👋 ¡Bienvenido de nuevo!\n¿En qué podemos ayudarte hoy? 💈';
+      } else {
+        // Estado nuevo (por defecto)
+        console.log('🆕 Cliente nuevo');
+        responseMessage = '👋 Gracias por escribir a nuestra barbería.\nEn breve un barbero te atenderá.';
+      }
     }
     
-    // Simular envío de mensaje (sin Twilio real)
+    // Agregar mensaje a TwiML
+    twiml.message(responseMessage);
+    
+    // Log del mensaje de respuesta
     console.log('📤 Mensaje de respuesta:');
     console.log(responseMessage);
     
-    // Respuesta vacía correcta para Twilio (debe ser 200 sin body)
-    res.sendStatus(200);
+    // Responder con TwiML (XML)
+    res.writeHead(200, { 'Content-Type': 'text/xml' });
+    res.end(twiml.toString());
     
   } catch (error) {
     // En caso de error, loguear pero responder 200 para no causar reintentos
     console.error('❌ Error al procesar webhook:', error);
-    res.sendStatus(200);
+    const twiml = new twilio.twiml.MessagingResponse();
+    twiml.message('⚠️ Ocurrió un error. Por favor intenta más tarde.');
+    res.writeHead(200, { 'Content-Type': 'text/xml' });
+    res.end(twiml.toString());
   }
 });
 
